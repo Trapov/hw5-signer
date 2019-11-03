@@ -15,6 +15,10 @@ CombineResults(multiHashResult) =>
 CombineResults(MultiHash(SingleHash(1,2,3,4,5)))
 ```
 
+# Important
+
+## You can't call `md5` concurently, if you do, then it will be overheated for **1** second.
+
 # .NET Core 3.0
 ``` ini
 
