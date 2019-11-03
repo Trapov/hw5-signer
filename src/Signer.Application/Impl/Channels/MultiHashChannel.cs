@@ -26,7 +26,6 @@ namespace Signer.Application
             {
                 await foreach (var element in input.ReadAllAsync())
                 {
-                    var rightSideNotCompleted = await Signers.DataSignerMd5(element);
                     var _ = Task.Run(async () =>
                     {
                         var results = await Task.WhenAll(

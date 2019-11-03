@@ -8,10 +8,10 @@ namespace Signer.Application
 {
     public static class Program
     {
-        public const int CombineBy = 100;
-        public const int InputElements = 1000;
+        public const int CombineBy = 1000;
+        public const int InputElements = 10_000;
 
-        public static void Main() => Pipes();
+        public static void Main() => Channels();
 
         public static void Channels()
         {
@@ -24,15 +24,15 @@ namespace Signer.Application
                 input: Enumerable.Range(0, InputElements).Select(p => p.ToString()),
 
                 new SingleHashChannel(),
-                new OnEachChannel((element) =>
-                {
-                    Console.Out.WriteLine($"SingleHashed -> [{element}]");
-                }),
+                //new OnEachChannel((element) =>
+                //{
+                //    Console.Out.WriteLine($"SingleHashed -> [{element}]");
+                //}),
                 new MultiHashChannel(6),
-                new OnEachChannel((element) =>
-                {
-                    Console.Out.WriteLine($"MultiHashed (6x) -> [{element[0..10]}...{element[^10..^1]}]");
-                }),
+                //new OnEachChannel((element) =>
+                //{
+                //    Console.Out.WriteLine($"MultiHashed (6x) -> [{element[0..10]}...{element[^10..^1]}]");
+                //}),
                 new CombineResultsChannel(CombineBy),
 
                 new OnEachChannel((element) =>
