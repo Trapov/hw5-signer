@@ -11,7 +11,7 @@ namespace Signer.Application
         public const int CombineBy = 1;
         public const int InputElements = 1;
 
-        public static void Main() => Channel();
+        public static void Main() => Channels();
 
         public static void Channels()
         {
