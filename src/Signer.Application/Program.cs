@@ -2,22 +2,28 @@
 using System.Linq;
 using System.Diagnostics;
 using System.Threading;
-using System.Threading.Channels;
+using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Running;
 
 namespace Signer.Application
 {
-    public static class Program
+    [MemoryDiagnoser]
+    [ThreadingDiagnoser]
+    [CoreJob]
+    public  class ChannelsVsPipesBenchMark
     {
-        public const int CombineBy = 1000;
-        public const int InputElements = 10_000;
+        [Params(10)]
+        public int CombineBy;
 
-        public static void Main() => Channels();
+        [Params(10, 100, 1000)]
+        public int InputElements;
 
-        public static void Channels()
+        [Benchmark]
+        public void Channels()
         {
-            var stopWatch = new Stopwatch();
+            //var stopWatch = new Stopwatch();
             var manualSlim = new ManualResetEventSlim();
-            stopWatch.Start();
+            //stopWatch.Start();
             var counter = 0;
 
             Pipeline.Execute(
@@ -33,6 +39,92 @@ namespace Signer.Application
                 //{
                 //    Console.Out.WriteLine($"MultiHashed (6x) -> [{element[0..10]}...{element[^10..^1]}]");
                 //}),
+                new CombineResultsChannel(CombineBy),
+
+                new OnEachChannel((element) =>
+                {
+                    counter++;
+                    //Console.Out.WriteLine($"Combined by ({CombineBy}) of total ({InputElements}) -> [{element[0..10]}...{element[^10..^1]}]");
+                    if (counter == InputElements / CombineBy)
+                    {
+                        //stopWatch.Stop();
+                        //Console.Out.WriteLine($"\n\n Elapsed {stopWatch.Elapsed}... \n\n");
+                        manualSlim.Set();
+                    }
+                })
+            );
+
+            manualSlim.Wait();
+        }
+
+        [Benchmark]
+        public void Pipes()
+        {
+            //var stopWatch = new Stopwatch();
+            var manualSlim = new ManualResetEventSlim();
+            //stopWatch.Start();
+            var counter = 0;
+
+            Pipeline.Execute(
+                input: Enumerable.Range(0, InputElements).Select(p => p.ToString()),
+
+                new SingleHash(),
+                //new OnEach((element) => 
+                //{
+                //    Console.Out.WriteLine($"SingleHashed -> [{element}]");
+                //}),
+                new MultiHash(6),
+                //new OnEach((element) =>
+                //{
+                //    Console.Out.WriteLine($"MultiHashed (6x) -> [{element[0..10]}...{element[^10..^1]}]");
+                //}),
+                new CombineResults(CombineBy),
+
+                new OnEach((element) =>
+                {
+                    counter++;
+                    //Console.Out.WriteLine($"Combined by ({CombineBy}) of total ({InputElements}) -> [{element[0..10]}...{element[^10..^1]}]");
+                    if (counter == InputElements / CombineBy)
+                    {
+                        //stopWatch.Stop();
+                        //Console.Out.WriteLine($"\n\n Elapsed {stopWatch.Elapsed}... \n\n");
+                        manualSlim.Set();
+                    }
+                })
+            );
+
+            manualSlim.Wait();
+        }
+    }
+
+    public static class Program
+    {
+        public const int CombineBy = 50;
+        public const int InputElements = 50;
+
+        public static void Main() =>
+            BenchmarkRunner.Run<ChannelsVsPipesBenchMark>();
+
+        public static void Channels()
+        {
+            var stopWatch = new Stopwatch();
+            var manualSlim = new ManualResetEventSlim();
+            stopWatch.Start();
+            var counter = 0;
+
+            Pipeline.Execute(
+                input: Enumerable.Range(0, InputElements).Select(p => p.ToString()),
+
+                new SingleHashChannel(),
+                new OnEachChannel((element) =>
+                {
+                    Console.Out.WriteLine($"SingleHashed -> [{element}]");
+                }),
+                new MultiHashChannel(6),
+                new OnEachChannel((element) =>
+                {
+                    Console.Out.WriteLine($"MultiHashed (6x) -> [{element[0..10]}...{element[^10..^1]}]");
+                }),
                 new CombineResultsChannel(CombineBy),
 
                 new OnEachChannel((element) =>
@@ -62,15 +154,15 @@ namespace Signer.Application
                 input: Enumerable.Range(0, InputElements).Select(p => p.ToString()),
 
                 new SingleHash(),
-                //new OnEach((element) => 
-                //{
-                //    Console.Out.WriteLine($"SingleHashed -> [{element}]");
-                //}),
+                new OnEach((element) =>
+                {
+                    Console.Out.WriteLine($"SingleHashed -> [{element}]");
+                }),
                 new MultiHash(6),
-                //new OnEach((element) =>
-                //{
-                //    Console.Out.WriteLine($"MultiHashed (6x) -> [{element[0..10]}...{element[^10..^1]}]");
-                //}),
+                new OnEach((element) =>
+                {
+                    Console.Out.WriteLine($"MultiHashed (6x) -> [{element[0..10]}...{element[^10..^1]}]");
+                }),
                 new CombineResults(CombineBy),
 
                 new OnEach((element) =>
