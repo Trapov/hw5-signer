@@ -34,7 +34,7 @@ namespace Signer.Application
 
             var @out = inputChannel.Reader;
 
-            foreach (var pipe in pipeables.Skip(1))
+            foreach (var pipe in pipeables)
                 @out = pipe.In(@out);
 
             return pipeables.Last();
