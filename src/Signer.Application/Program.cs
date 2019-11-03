@@ -8,10 +8,10 @@ namespace Signer.Application
 {
     public static class Program
     {
-        public const int CombineBy = 1;
-        public const int InputElements = 1;
+        public const int CombineBy = 100;
+        public const int InputElements = 1000;
 
-        public static void Main() => Channels();
+        public static void Main() => Pipes();
 
         public static void Channels()
         {
