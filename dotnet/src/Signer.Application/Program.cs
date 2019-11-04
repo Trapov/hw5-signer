@@ -4,19 +4,33 @@ using System.Diagnostics;
 using System.Threading;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
+using Akka.Actor;
+using Signer.Application.Impl.Actors.Akka;
+using System.Threading.Tasks;
 
 namespace Signer.Application
 {
     [MemoryDiagnoser]
     [ThreadingDiagnoser]
     [CoreJob]
-    public  class ChannelsVsPipesBenchMark
+    public  class Bench
     {
         [Params(10)]
         public int CombineBy;
 
         [Params(10, 100, 1000)]
         public int InputElements;
+
+        [Benchmark]
+        public void Actors()
+        {
+            
+            var system = ActorSystem.Create("hashing");
+            var manualResetSlim = new ManualResetEventSlim();
+            var pipeline = system.ActorOf(PipelineActor.Configure(InputElements, CombineBy, manualResetSlim), "pipeline");
+
+            manualResetSlim.Wait();
+        }
 
         [Benchmark]
         public void Channels()
@@ -58,7 +72,7 @@ namespace Signer.Application
         }
 
         [Benchmark]
-        public void Pipes()
+        public void BlockingCollection()
         {
             //var stopWatch = new Stopwatch();
             var manualSlim = new ManualResetEventSlim();
@@ -99,11 +113,19 @@ namespace Signer.Application
 
     public static class Program
     {
-        public const int CombineBy = 50;
-        public const int InputElements = 50;
+        public const int CombineBy = 1000;
+        public const int InputElements = 1000;
 
-        public static void Main() =>
-            BenchmarkRunner.Run<ChannelsVsPipesBenchMark>();
+        public static void Main() => BenchmarkRunner.Run<Bench>();
+
+        public static void Actors()
+        {
+            var system = ActorSystem.Create("hashing");
+            var manualResetSlim = new ManualResetEventSlim();
+            var pipeline = system.ActorOf(PipelineActor.Configure(1000, 10, manualResetSlim), "pipeline");
+
+            manualResetSlim.Wait();
+        }
 
         public static void Channels()
         {

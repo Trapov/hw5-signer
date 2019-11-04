@@ -6,8 +6,8 @@ from concurrent.futures.thread import ThreadPoolExecutor
 from asyncio import AbstractEventLoop
 import time
 
-COMBINE_BY = 10_000
-INPUT_ELEMENTS = 10_000 
+COMBINE_BY = 1000
+INPUT_ELEMENTS = 1000 
 global counter
 counter = 0
 

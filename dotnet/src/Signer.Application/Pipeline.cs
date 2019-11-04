@@ -9,10 +9,8 @@ namespace Signer.Application
     {
         public static IPipeable<TValue> Execute<TValue>(IEnumerable<TValue> input, params IPipeable<TValue>[] pipeables)
         {
-            var firstPipe = pipeables.First();
-            var @out = firstPipe.In(input);
-
-            foreach (var pipe in pipeables.Skip(1))
+            var @out = input;
+            foreach (var pipe in pipeables)
                 @out = pipe.In(@out);
 
             return pipeables.Last();
@@ -26,10 +24,10 @@ namespace Signer.Application
                 SingleWriter = true
             });
 
-            Task.Run(async () =>
+            Task.Run(() =>
             {
                 foreach (var @el in input)
-                    await inputChannel.Writer.WriteAsync(@el);
+                    inputChannel.Writer.WriteAsync(@el);
             });
 
             var @out = inputChannel.Reader;
