@@ -5,7 +5,6 @@ using System.Linq;
 
 namespace Signer.Application
 {
-
     public sealed class MultiHash : IPipeable<string>
     {
         private readonly BlockingCollection<string> _outPutStream = new BlockingCollection<string>();

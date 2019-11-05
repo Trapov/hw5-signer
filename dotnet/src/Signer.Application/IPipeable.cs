@@ -3,7 +3,6 @@ using System.Threading.Channels;
 
 namespace Signer.Application
 {
-
     public interface IPipeable<TValue>
     {
         IEnumerable<TValue> In(IEnumerable<TValue> input);
