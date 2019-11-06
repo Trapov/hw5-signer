@@ -7,9 +7,11 @@ from asyncio import AbstractEventLoop
 import time
 
 COMBINE_BY = 1000
-INPUT_ELEMENTS = 1000 
+INPUT_ELEMENTS = 10_000 
 global counter
 counter = 0
+global single_hash_worker_counter
+single_hash_worker_counter = 0
 
 async def __single_hash_worker_continuation(el :str, md5_result : str, out_stream : asyncio.queues.Queue):
         start_time = time.time()
@@ -22,8 +24,10 @@ async def __single_hash_worker_continuation(el :str, md5_result : str, out_strea
         print(f"SingleHashed => [{result}]. Elapsed [{time.time()-start_time}]")
 
 async def __single_hash_worker(in_stream : asyncio.queues.Queue, out_stream : asyncio.queues.Queue):
+    global single_hash_worker_counter
     while True:
         el = await in_stream.get()
+        single_hash_worker_counter += 1
         md5_result = await md5(el)
 
         asyncio.create_task(__single_hash_worker_continuation(el, md5_result, out_stream))
@@ -111,4 +115,5 @@ if __name__ == "__main__":
 
         print(f'Done hashing [{INPUT_ELEMENTS}] elements. Elapsed {time.time()-start_time} seconds.')
 
-    asyncio.run(main())    
+    asyncio.run(main())
+    print(f'Single-hash counter -> {single_hash_worker_counter}')
