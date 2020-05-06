@@ -1,15 +1,15 @@
 ﻿using System;
-using System.Threading.Tasks;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Signer.Application
 {
     public static class Signers
     {
         public const string Salt = "";
-        public static int OverheatedToggle = 0; 
+        public static int OverheatedToggle = 0;
 
         public static void OverHeatLock()
         {

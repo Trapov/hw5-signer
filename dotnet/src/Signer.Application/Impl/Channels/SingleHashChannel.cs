@@ -1,5 +1,5 @@
-﻿using System.Threading.Tasks;
-using System.Threading.Channels;
+﻿using System.Threading.Channels;
+using System.Threading.Tasks;
 
 namespace Signer.Application
 {
@@ -21,7 +21,7 @@ namespace Signer.Application
                     var rightSideNotCompleted = await Signers.DataSignerMd5(element);
                     var _ = Task.Run(async () =>
                     {
-                        _outPutChannel.Writer.WriteAsync(
+                        await _outPutChannel.Writer.WriteAsync(
                             string.Join("~",
                                 await Task.WhenAll(
                                     Signers.DataSignerCrc32(element),

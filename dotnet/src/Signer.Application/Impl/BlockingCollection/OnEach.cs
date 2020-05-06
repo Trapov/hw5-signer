@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 
 namespace Signer.Application
 {
-
     public sealed class OnEach : IPipeable<string>
     {
         private readonly BlockingCollection<string> _outPutStream = new BlockingCollection<string>();

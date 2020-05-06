@@ -27,7 +27,7 @@ namespace Signer.Application
                 await foreach (var @el in input.ReadAllAsync())
                 {
                     _action(@el);
-                    _outPutChannel.Writer.WriteAsync(el);
+                    await _outPutChannel.Writer.WriteAsync(el);
                 }
             });
 

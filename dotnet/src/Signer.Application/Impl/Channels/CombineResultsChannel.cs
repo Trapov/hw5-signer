@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
-using System.Threading.Tasks;
 using System.Threading.Channels;
+using System.Threading.Tasks;
 
 namespace Signer.Application
 {
@@ -39,7 +39,7 @@ namespace Signer.Application
                     Counter = 0;
 
                     list.Sort();
-                    _outPutChannel.Writer.WriteAsync(string.Join("_", list));
+                    await _outPutChannel.Writer.WriteAsync(string.Join("_", list));
                     list.Clear();
                 }
             });

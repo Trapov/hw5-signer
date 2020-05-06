@@ -26,7 +26,7 @@ namespace Signer.Application.Impl.Actors.Akka
         {
             _stored.Add(input);
 
-            if(_stored.Count == 10)
+            if (_stored.Count == 10)
             {
                 Context.Parent.Tell(new CombineResultsResult(string.Join('_', _stored)));
                 _stored.Clear();

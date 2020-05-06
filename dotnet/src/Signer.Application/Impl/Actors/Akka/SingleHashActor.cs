@@ -1,15 +1,82 @@
 ﻿using Akka.Actor;
-using System;
-using System.Threading.Tasks;
 
 namespace Signer.Application.Impl.Actors.Akka
 {
     public sealed class SingleHashActor : ReceiveActor
     {
+        private readonly IActorRef _leftSideActor;
+        private readonly IActorRef _rightSideActor;
+
+        private string _leftSide = null;
+        private string _rightSide = null;
+
+        internal sealed class LeftSideActor : ReceiveActor
+        {
+            public LeftSideActor() => Receive<string>(HandleAsync);
+            private async void HandleAsync(string input) => Sender.Tell(new Result(await Signers.DataSignerCrc32(input)));
+            public sealed class Result
+            {
+                public Result(string value)
+                {
+                    Value = value;
+                }
+
+                public string Value { get; }
+            }
+        }
+        internal sealed class RightSideActor : ReceiveActor
+        {
+            public RightSideActor()
+            {
+                Receive<string>(Handle);
+                Receive<Md5Actor.Md5Result>(HandleAsync);
+            }
+
+            private async void HandleAsync(Md5Actor.Md5Result result) => Context.Parent.Tell(new Result(await Signers.DataSignerCrc32(result.Value)));
+            private async void Handle(string input) => Context.ActorSelection($"../../{nameof(Md5Actor)}").Tell(input);
+
+            public sealed class Result
+            {
+                public Result(string value)
+                {
+                    Value = value;
+                }
+
+                public string Value { get; }
+            }
+        }
+
         public SingleHashActor()
         {
-            ReceiveAsync<string>(HandleAsync);
-            Receive<SingleHashResult>(m => Context.Parent.Forward(m));
+            Receive<string>(Handle);
+
+            Receive<RightSideActor.Result>(Handle);
+            Receive<LeftSideActor.Result>(Handle);
+
+            _leftSideActor = Context.ActorOf<LeftSideActor>();
+            _rightSideActor = Context.ActorOf<RightSideActor>();
+        }
+
+        private void Handle(RightSideActor.Result result)
+        {
+            _rightSide = result.Value;
+
+            if (_leftSide != null)
+                Context.Parent.Tell(new SingleHashResult(string.Concat(_leftSide, "~", _rightSide)));
+        }
+
+        private void Handle(LeftSideActor.Result result)
+        {
+            _leftSide = result.Value;
+
+            if (_rightSide != null)
+                Context.Parent.Tell(new SingleHashResult(string.Concat(_leftSide, "~", _rightSide)));
+        }
+
+        public async void Handle(string input)
+        {
+            _leftSideActor.Tell(input);
+            _rightSideActor.Tell(input);
         }
 
         public sealed class SingleHashResult
@@ -20,104 +87,6 @@ namespace Signer.Application.Impl.Actors.Akka
             }
 
             public string Value { get; }
-        }
-
-        public sealed class ForLeftSide
-        {
-            public ForLeftSide(string value)
-            {
-                Value = value;
-            }
-
-            public string Value { get; }
-        }
-
-        public sealed class ForRightSide
-        {
-            public ForRightSide(string value)
-            {
-                Value = value;
-            }
-
-            public string Value { get; }
-        }
-
-        sealed class Crc32Worker : ReceiveActor
-        {
-            private string _leftSide = string.Empty;
-            private string _rightSide = string.Empty;
-
-            public Crc32Worker()
-            {
-                Receive<ForLeftSide>(Handle);
-                Receive<ForRightSide>(Handle);
-
-                Receive<LeftSideDone>(Handle);
-                Receive<RightSideDone>(Handle);
-
-                Receive<SingleHashResult>(m => Context.Parent.Forward(m));
-            }
-
-            public sealed class RightSideDone
-            {
-                public RightSideDone(string value)
-                {
-                    Value = value;
-                }
-
-                public string Value { get; }
-            }
-
-            public sealed class LeftSideDone
-            {
-                public LeftSideDone(string value)
-                {
-                    Value = value;
-                }
-
-                public string Value { get; }
-            }
-
-            public void Handle(LeftSideDone leftSideDone)
-            {
-                _leftSide = leftSideDone.Value;
-                if (_rightSide != string.Empty)
-                {
-                    Context
-                        .Parent
-                    .Tell(new SingleHashResult(string.Join('~', _leftSide, _rightSide)));
-                }
-            }
-            public void Handle(RightSideDone rightSideDone)
-            {
-                _rightSide = rightSideDone.Value;
-                if (_leftSide != string.Empty)
-                {
-                    Context
-                        .Parent
-                    .Tell(new SingleHashResult(string.Join('~', _leftSide, _rightSide)));
-                }
-            }
-            public void Handle(ForLeftSide rawInput)
-            {
-                Signers.DataSignerCrc32(rawInput.Value)
-                    .PipeTo(Self, success: (i) => new LeftSideDone(i));
-            }
-
-            public void Handle(ForRightSide rawInput)
-            {
-                Signers.DataSignerCrc32(rawInput.Value)
-                    .PipeTo(Self, success: (i) => new RightSideDone(i));
-            }
-        }
-
-        public async Task HandleAsync(string input)
-        {
-            var crc32Worker = Context.ActorOf<Crc32Worker>();
-            crc32Worker.Tell(new ForLeftSide(input));
-
-            var md5Result = await Signers.DataSignerMd5(input);
-            crc32Worker.Tell(new ForRightSide(md5Result));
         }
     }
 }

@@ -1,6 +1,6 @@
-﻿using System.Threading.Tasks;
-using System.Linq;
+﻿using System.Linq;
 using System.Threading.Channels;
+using System.Threading.Tasks;
 
 namespace Signer.Application
 {
@@ -33,7 +33,7 @@ namespace Signer.Application
                             .Range(0, _range)
                             .Select(i => Signers.DataSignerCrc32(i.ToString() + element))
                         );
-                        _outPutChannel.Writer.WriteAsync(string.Concat(results));
+                        await _outPutChannel.Writer.WriteAsync(string.Concat(results));
                     });
                 }
             });

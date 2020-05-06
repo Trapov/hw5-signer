@@ -1,17 +1,20 @@
 ﻿using Akka.Actor;
-using System;
+using Akka.Event;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace Signer.Application.Impl.Actors.Akka
 {
+
     public class PipelineActor : ReceiveActor
     {
         public readonly IActorRef SingleHash;
         public readonly IActorRef MultiHash;
         public readonly IActorRef CombineResults;
+        public readonly IActorRef Md5Actor;
+
+        private readonly ILoggingAdapter _log = new DummyLogger();
 
         private readonly int _combineBy = 10;
         private readonly int _inputElements = 10;
@@ -33,43 +36,41 @@ namespace Signer.Application.Impl.Actors.Akka
             MultiHash = Context.ActorOf<MultiHashActor>();
             CombineResults = Context.ActorOf<CombineResultsActor>();
 
+            Md5Actor = Context.ActorOf<Md5Actor>(nameof(Md5Actor));
+
             Receive<SingleHashActor.SingleHashResult>(HandleSingleHashResult);
             Receive<MultiHashActor.MultiHashResult>(HandleMultiHashResult);
             Receive<CombineResultsActor.CombineResultsResult>(HandleCombineResultsResult);
+            Receive<IEnumerable<string>>(Execute);
 
-            Execute(Enumerable.Range(0, inputElements).Select(i => i.ToString()));
+            Self.Tell(Enumerable.Range(0, inputElements).Select(i => i.ToString()), Self);
         }
 
         private void HandleCombineResultsResult(CombineResultsActor.CombineResultsResult obj)
         {
             _counter++;
-            Context.System.Log.Info(obj.Value);
+            _log.Info($"CombineResultsResult -> {obj.Value}");
 
-            if(_counter == (_inputElements / _combineBy))
-            {
+            if (_counter == (_inputElements / _combineBy))
                 _manualResetEventSlim.Set();
-            }
         }
 
-        public void Execute(IEnumerable<string> enumerable)
+        private void Execute(IEnumerable<string> enumerable)
         {
-            Task.Run(() => 
-            {
-                foreach (var e in enumerable)
-                    SingleHash.Tell(e);
-            });
+            foreach (var e in enumerable)
+                SingleHash.Tell(e);
         }
 
         private void HandleSingleHashResult(SingleHashActor.SingleHashResult singleHashResult)
         {
+            _log.Info($"SingleHashResult -> {singleHashResult.Value}");
             MultiHash.Tell(singleHashResult.Value);
-            Context.System.Log.Info(singleHashResult.Value);
         }
 
         private void HandleMultiHashResult(MultiHashActor.MultiHashResult singleHashResult)
         {
+            _log.Info($"MultiHashResult -> {singleHashResult.Value}");
             CombineResults.Tell(singleHashResult.Value);
-            Context.System.Log.Info(singleHashResult.Value);
         }
     }
 }

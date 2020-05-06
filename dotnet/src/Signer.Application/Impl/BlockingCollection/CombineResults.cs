@@ -1,11 +1,9 @@
-﻿using System.Collections.Generic;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading.Tasks;
-using System.Linq;
 
 namespace Signer.Application
 {
-
     public sealed class CombineResults : IPipeable<string>
     {
         private readonly BlockingCollection<string> _outPutStream = new BlockingCollection<string>();
