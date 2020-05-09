@@ -1,72 +1,41 @@
 ﻿using Akka.Actor;
 using BenchmarkDotNet.Running;
-using Orleans;
 using Signer.Application.Impl.Actors.Akka;
-using Signer.Application.Impl.Actors.Orleans;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Akka.Configuration;
+using Akka.Configuration.Hocon;
 
 namespace Signer.Application
 {
     public static class Program
     {
-        public const int CombineBy = 10;
-        public const int InputElements = 1000;
+        private const int CombineBy = 10;
+        private const int InputElements = 1000;
 
-        public static void Main() => AkkaActors();
-
+        public static async Task Main() => Bench();
         public static void Bench() => BenchmarkRunner.Run<GlobalBench>();
-        public static void OrleansActors()
-        {
-            var host = OrleansPipeline.GetHost();
-            host.StartAsync().GetAwaiter().GetResult();
-            var client = OrleansPipeline.GetClient();
-            client.Connect().GetAwaiter().GetResult();
-            var stopWatch = new Stopwatch();
-            var md5Grain = client.GetGrain<IMd5SignerGrain>("IMd5SignerGrain");
-            var tasks = new Task[InputElements];
-
-            stopWatch.Start();
-
-            static async Task SignerFlow(IMd5SignerGrain md5Grain, IClusterClient clusterClient, string input)
-            {
-                var singleHashGrain = clusterClient.GetGrain<ISingleHashGrain>(input);
-                var singleHashResult = await singleHashGrain.SingleHash(md5Grain, input);
-                Console.Out.WriteLine($"SingleHash -> {singleHashResult}");
-                var multiHashGrain = clusterClient.GetGrain<IMultiHashGrain>(input);
-                var resultMulti = await multiHashGrain.MultiHash(singleHashResult);
-                Console.Out.WriteLine($"MultiHash -> {resultMulti}");
-                var combineGrain = clusterClient.GetGrain<ICombineResultsGrain>("ICombineResultsGrain");
-                var combineResult = await combineGrain.CombineResults(resultMulti);
-
-                if (combineResult != null)
-                    Console.Out.WriteLine($"CombineResults -> {combineResult}");
-            }
-
-            foreach (var (index, input) in Enumerable.Range(0, InputElements).Select((i, p) => (i, p.ToString())))
-                tasks[index] = SignerFlow(md5Grain, client, input);
-
-            Task.WaitAll(tasks);
-            stopWatch.Stop();
-            Console.Out.WriteLine($"\n\n Elapsed {stopWatch.Elapsed}... \n\n");
-        }
         public static void AkkaActors()
         {
             var stopWatch = new Stopwatch();
-
-            using var system = ActorSystem.Create("hashing");
+            const string akkaConfig = @"
+akka {
+  loggers = [""Akka.Event.DefaultLogger""]
+}
+";
+            using var system = ActorSystem.Create("hashing", ConfigurationFactory.ParseString(akkaConfig));
             using var manualResetSlim = new ManualResetEventSlim();
             stopWatch.Start();
 
             var pipeline = system.ActorOf(PipelineActor.Configure(InputElements, CombineBy, manualResetSlim), "pipeline");
-
+            pipeline.Tell(Enumerable.Range(0, InputElements).Select(i => i.ToString()));
             manualResetSlim.Wait();
             stopWatch.Stop();
             Console.Out.WriteLine($"\n\n Elapsed {stopWatch.Elapsed}... \n\n");
-
         }
         public static void Channels()
         {

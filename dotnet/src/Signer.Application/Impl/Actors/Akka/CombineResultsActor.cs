@@ -6,31 +6,22 @@ namespace Signer.Application.Impl.Actors.Akka
     public sealed class CombineResultsActor : ReceiveActor
     {
         private readonly List<string> _stored = new List<string>();
-
-        public CombineResultsActor()
-        {
-            Receive<string>(Handle);
-        }
+        public CombineResultsActor() => Receive<string>(Handle);
 
         public sealed class CombineResultsResult
         {
-            public CombineResultsResult(string value)
-            {
-                Value = value;
-            }
-
+            public CombineResultsResult(string value) => Value = value;
             public string Value { get; }
         }
 
-        public void Handle(string input)
+        private void Handle(string input)
         {
             _stored.Add(input);
 
-            if (_stored.Count == 10)
-            {
-                Context.Parent.Tell(new CombineResultsResult(string.Join('_', _stored)));
-                _stored.Clear();
-            }
+            if (_stored.Count != 10) return;
+            
+            Context.Parent.Tell(new CombineResultsResult(string.Join('_', _stored)));
+            _stored.Clear();
         }
     }
 }

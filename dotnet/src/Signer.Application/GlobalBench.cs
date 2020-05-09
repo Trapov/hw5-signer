@@ -1,92 +1,61 @@
-﻿using Akka.Actor;
+﻿using System;
+using Akka.Actor;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Order;
-using Orleans;
-using Orleans.Hosting;
 using Signer.Application.Impl.Actors.Akka;
-using Signer.Application.Impl.Actors.Orleans;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Akka.Configuration;
 
 namespace Signer.Application
 {
     [MemoryDiagnoser]
     [ThreadingDiagnoser]
+    [HtmlExporter]
     [Orderer(SummaryOrderPolicy.FastestToSlowest)]
-    [RankColumn(BenchmarkDotNet.Mathematics.NumeralSystem.Stars)]
+    [RankColumn()]
     [SimpleJob(BenchmarkDotNet.Jobs.RuntimeMoniker.NetCoreApp31)]
     public class GlobalBench
     {
-        [Params(100)]
+        [Params(10)]
         public int CombineBy;
 
         [Params(10, 100, 1000, 10_000)]
         public int InputElements;
 
         public ActorSystem ActorSystem;
-        public ISiloHost SiloHost;
-        public IClusterClient ClusterClient;
-        public IMd5SignerGrain Md5Grain;
+        public IActorRef PipelineActorRef;
+        public ManualResetEventSlim ManualResetSlimForAkkaActors;
 
-
-        [IterationSetup(Target = "AkkaActors")]
+        [IterationSetup(Target = nameof(AkkaActors))]
         public void SetupAkkaActors()
         {
-            ActorSystem = ActorSystem.Create("hashing");
+            const string akkaConfig = @"
+akka {
+  loglevel = WARNING
+}
+";
+            ActorSystem = ActorSystem.Create("hashing", ConfigurationFactory.ParseString(akkaConfig));
+            ManualResetSlimForAkkaActors = new ManualResetEventSlim();
+            PipelineActorRef =  ActorSystem.ActorOf(PipelineActor.Configure(InputElements, CombineBy, ManualResetSlimForAkkaActors), "pipeline");
         }
 
-        [IterationCleanup(Target = "AkkaActors")]
-        public void CleanUpAkkaActors()
+        [IterationCleanup(Target = nameof(AkkaActors))]
+        public async void CleanUpAkkactors()
         {
+            await ActorSystem.Terminate();
             ActorSystem.Dispose();
-        }
-
-        [GlobalSetup(Target = "OrleansActors")]
-        public void SetUpOrleansActors()
-        {
-
-            SiloHost = OrleansPipeline.GetHost();
-            SiloHost.StartAsync().GetAwaiter().GetResult();
-            ClusterClient = OrleansPipeline.GetClient();
-            ClusterClient.Connect().GetAwaiter().GetResult();
-            Md5Grain = ClusterClient.GetGrain<IMd5SignerGrain>("IMd5SignerGrain");
-        }
-
-        [GlobalCleanup(Target = "OrleansActors")]
-        public void CleanUpOrleansActors()
-        {
-            ClusterClient.Dispose();
-            SiloHost.Dispose();
+            ManualResetSlimForAkkaActors.Dispose();
         }
 
         [Benchmark]
-        public void OrleansActors()
-        {
-            var tasks = new Task[InputElements];
-
-            static async Task SignerFlow(IMd5SignerGrain md5Grain, IClusterClient clusterClient, string input)
-            {
-                var singleHashGrain = clusterClient.GetGrain<ISingleHashGrain>(input);
-                var singleHashResult = await singleHashGrain.SingleHash(md5Grain, input);
-                var multiHashGrain = clusterClient.GetGrain<IMultiHashGrain>(input);
-                var resultMulti = await multiHashGrain.MultiHash(singleHashResult);
-                var combineGrain = clusterClient.GetGrain<ICombineResultsGrain>("ICombineResultsGrain");
-                var combineResult = await combineGrain.CombineResults(resultMulti);
-            }
-
-            foreach (var (index, input) in Enumerable.Range(0, InputElements).Select((i, p) => (i, p.ToString())))
-                tasks[index] = SignerFlow(Md5Grain, ClusterClient, input);
-
-            Task.WaitAll(tasks);
-        }
-
-        [Benchmark]
+        [BenchmarkCategory(nameof(AkkaActors))]
         public void AkkaActors()
         {
-            var manualResetSlim = new ManualResetEventSlim();
-            var _ = ActorSystem.ActorOf(PipelineActor.Configure(InputElements, CombineBy, manualResetSlim), "pipeline");
-            manualResetSlim.Wait();
+            PipelineActorRef.Tell(Enumerable.Range(0, InputElements).Select(i => i.ToString()));
+            ManualResetSlimForAkkaActors.Wait();
+            ManualResetSlimForAkkaActors.Reset();
         }
 
         [Benchmark]

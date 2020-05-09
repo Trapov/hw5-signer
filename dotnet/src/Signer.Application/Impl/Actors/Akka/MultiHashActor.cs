@@ -8,21 +8,13 @@ namespace Signer.Application.Impl.Actors.Akka
     {
         public sealed class MultiHashResult
         {
-            public MultiHashResult(string value)
-            {
-                Value = value;
-            }
-
+            public MultiHashResult(string value) => Value = value;
             public string Value { get; }
         }
 
-        public sealed class MultiHashDone
+        private sealed class MultiHashDone
         {
-            public MultiHashDone(string[] value)
-            {
-                Value = value;
-            }
-
+            public MultiHashDone(string[] value) => Value = value;
             public string[] Value { get; }
         }
 
@@ -32,7 +24,7 @@ namespace Signer.Application.Impl.Actors.Akka
             Receive<MultiHashDone>(Handle);
         }
 
-        public void Handle(string input)
+        private void Handle(string input)
         {
             Task.WhenAll(
                 Enumerable
@@ -41,9 +33,6 @@ namespace Signer.Application.Impl.Actors.Akka
             ).PipeTo(Self, success: r => new MultiHashDone(r));
         }
 
-        public void Handle(MultiHashDone done)
-        {
-            Context.Parent.Tell(new MultiHashResult(string.Concat(done.Value)));
-        }
+        private static void Handle(MultiHashDone done) => Context.Parent.Tell(new MultiHashResult(string.Concat(done.Value)));
     }
 }

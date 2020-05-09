@@ -1,49 +1,46 @@
 ﻿using Akka.Actor;
 using Akka.Event;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
+using Akka.Routing;
 
 namespace Signer.Application.Impl.Actors.Akka
 {
-
-    public class PipelineActor : ReceiveActor
+    public sealed class PipelineActor : ReceiveActor
     {
-        public readonly IActorRef SingleHash;
-        public readonly IActorRef MultiHash;
-        public readonly IActorRef CombineResults;
+        private readonly IActorRef _singleHashActor;
+        private readonly IActorRef _multiHashActor;
+        private readonly IActorRef _combineResultsActor;
         public readonly IActorRef Md5Actor;
 
-        private readonly ILoggingAdapter _log = new DummyLogger();
+        private readonly ILoggingAdapter _log = Context.GetLogger();
 
-        private readonly int _combineBy = 10;
-        private readonly int _inputElements = 10;
+        private readonly int _combineBy;
+        private readonly int _inputElements;
         private int _counter = 0;
         private readonly ManualResetEventSlim _manualResetEventSlim;
 
-        public static Props Configure(int inputElements, int combineBy, ManualResetEventSlim manualResetSlim)
-        {
-            return Props.Create<PipelineActor>(inputElements, combineBy, manualResetSlim);
-        }
+        public static Props Configure(int inputElements, int combineBy, ManualResetEventSlim manualResetSlim) => 
+            Props.Create<PipelineActor>(inputElements, combineBy, manualResetSlim);
 
         public PipelineActor(int inputElements, int combineBy, ManualResetEventSlim manualResetEventSlim)
         {
             _inputElements = inputElements;
             _combineBy = combineBy;
             _manualResetEventSlim = manualResetEventSlim;
-
-            SingleHash = Context.ActorOf<SingleHashActor>();
-            MultiHash = Context.ActorOf<MultiHashActor>();
-            CombineResults = Context.ActorOf<CombineResultsActor>();
-
             Md5Actor = Context.ActorOf<Md5Actor>(nameof(Md5Actor));
+
+            _singleHashActor = Context.ActorOf(
+                    Props.Create<SingleHashActor>(Md5Actor, Self)
+                        .WithRouter(new RoundRobinPool(inputElements))
+                );
+            _multiHashActor = Context.ActorOf<MultiHashActor>();
+            _combineResultsActor = Context.ActorOf<CombineResultsActor>();
 
             Receive<SingleHashActor.SingleHashResult>(HandleSingleHashResult);
             Receive<MultiHashActor.MultiHashResult>(HandleMultiHashResult);
             Receive<CombineResultsActor.CombineResultsResult>(HandleCombineResultsResult);
             Receive<IEnumerable<string>>(Execute);
-
-            Self.Tell(Enumerable.Range(0, inputElements).Select(i => i.ToString()), Self);
         }
 
         private void HandleCombineResultsResult(CombineResultsActor.CombineResultsResult obj)
@@ -51,26 +48,28 @@ namespace Signer.Application.Impl.Actors.Akka
             _counter++;
             _log.Info($"CombineResultsResult -> {obj.Value}");
 
-            if (_counter == (_inputElements / _combineBy))
-                _manualResetEventSlim.Set();
+            if (_counter != (_inputElements / _combineBy)) return;
+            
+            _counter = 0;
+            _manualResetEventSlim.Set();
         }
 
         private void Execute(IEnumerable<string> enumerable)
         {
             foreach (var e in enumerable)
-                SingleHash.Tell(e);
+                _singleHashActor.Tell(e);
         }
 
         private void HandleSingleHashResult(SingleHashActor.SingleHashResult singleHashResult)
         {
             _log.Info($"SingleHashResult -> {singleHashResult.Value}");
-            MultiHash.Tell(singleHashResult.Value);
+            _multiHashActor.Tell(singleHashResult.Value);
         }
 
         private void HandleMultiHashResult(MultiHashActor.MultiHashResult singleHashResult)
         {
             _log.Info($"MultiHashResult -> {singleHashResult.Value}");
-            CombineResults.Tell(singleHashResult.Value);
+            _combineResultsActor.Tell(singleHashResult.Value);
         }
     }
 }

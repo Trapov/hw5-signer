@@ -3,11 +3,11 @@ using System;
 
 namespace Signer.Application.Impl.Actors.Akka
 {
-    internal sealed class DummyLogger : ILoggingAdapter
+    internal sealed class ToVoidLogger : ILoggingAdapter
     {
         public bool IsDebugEnabled => false;
 
-        public bool IsInfoEnabled => true;
+        public bool IsInfoEnabled => false;
 
         public bool IsWarningEnabled => false;
 
@@ -29,7 +29,9 @@ namespace Signer.Application.Impl.Actors.Akka
         {
         }
 
-        public void Info(string format, params object[] args) => Console.WriteLine(format, args);
+        public void Info(string format, params object[] args)
+        {
+        }
 
         public void Info(Exception cause, string format, params object[] args)
         {
@@ -40,7 +42,7 @@ namespace Signer.Application.Impl.Actors.Akka
             return logLevel switch
             {
                 LogLevel.DebugLevel => false,
-                LogLevel.InfoLevel => true,
+                LogLevel.InfoLevel => false,
                 LogLevel.WarningLevel => false,
                 LogLevel.ErrorLevel => false,
 
