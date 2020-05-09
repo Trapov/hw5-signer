@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 using Akka.Actor;
 
 namespace Signer.Application.Impl.Actors.Akka
@@ -7,7 +8,6 @@ namespace Signer.Application.Impl.Actors.Akka
     {
         private readonly IActorRef _leftSideActor;
         private readonly IActorRef _rightSideActor;
-        private readonly IActorRef _realParent;
 
         private string _leftSide = null;
         private string _rightSide = null;
@@ -49,9 +49,8 @@ namespace Signer.Application.Impl.Actors.Akka
             }
         }
 
-        public SingleHashActor(IActorRef md5Actor, IActorRef realParent)
+        public SingleHashActor(IActorRef md5Actor)
         {
-            _realParent = realParent;
             Receive<string>(Handle);
 
             Receive<RightSideActor.Result>(Handle);
@@ -66,7 +65,7 @@ namespace Signer.Application.Impl.Actors.Akka
             _rightSide = result.Value;
 
             if (_leftSide == null) return;
-            _realParent.Tell(new SingleHashResult(string.Concat(_leftSide, "~", _rightSide)));
+            Context.Parent.Tell(new SingleHashResult(string.Concat(_leftSide, "~", _rightSide)));
             _leftSide = null;
             _rightSide = null;
         }
@@ -76,7 +75,7 @@ namespace Signer.Application.Impl.Actors.Akka
             _leftSide = result.Value;
 
             if (_rightSide == null) return;
-            _realParent.Tell(new SingleHashResult(string.Concat(_leftSide, "~", _rightSide)));
+            Context.Parent.Tell(new SingleHashResult(string.Concat(_leftSide, "~", _rightSide)));
             _leftSide = null;
             _rightSide = null;
         }

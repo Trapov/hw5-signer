@@ -2,13 +2,11 @@
 using Akka.Event;
 using System.Collections.Generic;
 using System.Threading;
-using Akka.Routing;
 
 namespace Signer.Application.Impl.Actors.Akka
 {
     public sealed class PipelineActor : ReceiveActor
     {
-        private readonly IActorRef _singleHashActor;
         private readonly IActorRef _multiHashActor;
         private readonly IActorRef _combineResultsActor;
         public readonly IActorRef Md5Actor;
@@ -29,11 +27,7 @@ namespace Signer.Application.Impl.Actors.Akka
             _combineBy = combineBy;
             _manualResetEventSlim = manualResetEventSlim;
             Md5Actor = Context.ActorOf<Md5Actor>(nameof(Md5Actor));
-
-            _singleHashActor = Context.ActorOf(
-                    Props.Create<SingleHashActor>(Md5Actor, Self)
-                        // .WithRouter(new RoundRobinPool(inputElements)) // doesn't work as expected, might try another day
-                );
+            
             _multiHashActor = Context.ActorOf<MultiHashActor>();
             _combineResultsActor = Context.ActorOf<CombineResultsActor>();
 
@@ -57,7 +51,17 @@ namespace Signer.Application.Impl.Actors.Akka
         private void Execute(IEnumerable<string> enumerable)
         {
             foreach (var e in enumerable)
-                _singleHashActor.Tell(e);
+            {
+                var name = e + nameof(SingleHashActor);
+                
+                var child = Context.Child(name);
+                if(child.IsNobody())
+                    Context.ActorOf(
+                        Props.Create<SingleHashActor>(Md5Actor)
+                    ).Tell(e);
+                else
+                    child.Tell(e);
+            }
         }
 
         private void HandleSingleHashResult(SingleHashActor.SingleHashResult singleHashResult)
