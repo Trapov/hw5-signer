@@ -32,7 +32,7 @@ namespace Signer.Application.Impl.Actors.Akka
 
             _singleHashActor = Context.ActorOf(
                     Props.Create<SingleHashActor>(Md5Actor, Self)
-                        .WithRouter(new RoundRobinPool(inputElements))
+                        // .WithRouter(new RoundRobinPool(inputElements)) // doesn't work as expected, might try another day
                 );
             _multiHashActor = Context.ActorOf<MultiHashActor>();
             _combineResultsActor = Context.ActorOf<CombineResultsActor>();

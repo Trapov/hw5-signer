@@ -1,11 +1,9 @@
-﻿using System;
-using Akka.Actor;
+﻿using Akka.Actor;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Order;
 using Signer.Application.Impl.Actors.Akka;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using Akka.Configuration;
 
 namespace Signer.Application
@@ -21,7 +19,7 @@ namespace Signer.Application
         [Params(10)]
         public int CombineBy;
 
-        [Params(10, 100, 1000, 10_000)]
+        [Params(100, 1000, 10_000)]
         public int InputElements;
 
         public ActorSystem ActorSystem;
@@ -32,10 +30,10 @@ namespace Signer.Application
         public void SetupAkkaActors()
         {
             const string akkaConfig = @"
-akka {
-  loglevel = WARNING
-}
-";
+                akka {
+                  loglevel = INFO
+                }
+            ";
             ActorSystem = ActorSystem.Create("hashing", ConfigurationFactory.ParseString(akkaConfig));
             ManualResetSlimForAkkaActors = new ManualResetEventSlim();
             PipelineActorRef =  ActorSystem.ActorOf(PipelineActor.Configure(InputElements, CombineBy, ManualResetSlimForAkkaActors), "pipeline");

@@ -14,9 +14,8 @@ namespace Signer.Application
 {
     public static class Program
     {
-        private const int CombineBy = 10;
+        private const int CombineBy = 100;
         private const int InputElements = 1000;
-
         public static async Task Main() => Bench();
         public static void Bench() => BenchmarkRunner.Run<GlobalBench>();
         public static void AkkaActors()
